@@ -10,11 +10,14 @@ namespace AlwaysGreen
         private int[] _hashes = { 1043035044, -655644382, 865627822, 656557234, 862871082 };
         private float _spotOffset = 0;
         private List<Vehicle> _traffic = new List<Vehicle>();
+        private System.Diagnostics.Stopwatch _tick = new System.Diagnostics.Stopwatch();
+        
 
         public AlwaysGreen()
         {
             KeyDown += (object sender, System.Windows.Forms.KeyEventArgs e) =>
             {
+                // TODO: Probably it should has a rotation limit. 30-50 deg?
                 _spotOffset -= Convert.ToByte(GTA.Game.IsControlPressed(0, Control.MoveLeftOnly));
                 _spotOffset += Convert.ToByte(GTA.Game.IsControlPressed(0, Control.MoveRightOnly));
             };
@@ -28,7 +31,8 @@ namespace AlwaysGreen
 
             Tick += (object sender, EventArgs e) =>
             {
-                if (GTA.Game.Player.Character.IsInVehicle() == false) return;
+                // If you have a good CPU, you can lower the timing or even turn it off.
+                if (_tick.ElapsedMilliseconds < 500 || GTA.Game.Player.Character.IsInVehicle() == false) return;
 
                 // 100 is a max distance when the game can detect object as a traffic light.
                 float distance = Math.Min(30 + GTA.Game.Player.Character.CurrentVehicle.Speed, 100);
@@ -51,36 +55,34 @@ namespace AlwaysGreen
                 distance -= _spotOffset;
 
                 // The radius more than 30 can be very hard for CPU.
-                enteties.AddRange(GTA.World.GetNearbyEntities(GTA.Game.Player.Character.GetOffsetInWorldCoords(new GTA.Math.Vector3(13  + _spotOffset, distance, 0)), 15f));
-                enteties.AddRange(GTA.World.GetNearbyEntities(GTA.Game.Player.Character.GetOffsetInWorldCoords(new GTA.Math.Vector3(-55 + _spotOffset, distance, 0)), 15f));
+                enteties.AddRange(GTA.World.GetNearbyEntities(GTA.Game.Player.Character.GetOffsetInWorldCoords(new GTA.Math.Vector3(13  + _spotOffset, distance, 0)), 25f));
+                enteties.AddRange(GTA.World.GetNearbyEntities(GTA.Game.Player.Character.GetOffsetInWorldCoords(new GTA.Math.Vector3(-55 + _spotOffset, distance, 0)), 25f));
 
 
                 int changingTL = 0, crossingTL = 0, playerStreet = 0, playerXStreet = 0;
                 var playerPos = GTA.Game.Player.Character.Position;
                 foreach (var item in enteties)
                 {
+                    // Detect objects on player's road.
                     unsafe
                     {
-                        // Is this objets a traffic light and it standing on the player road.
                         GTAN.Function.Call(GTAN.Hash.GET_STREET_NAME_AT_COORD, item.Position.X, item.Position.Y, item.Position.Z, &changingTL, &crossingTL);
                         GTAN.Function.Call(GTAN.Hash.GET_STREET_NAME_AT_COORD, playerPos.X, playerPos.Y, playerPos.Z, &playerStreet, &playerXStreet);
                     }
-
+                    
                     if (changingTL == playerStreet && GTAN.Function.Call<bool>(GTAN.Hash.IS_ENTITY_A_VEHICLE, item) && ((GTA.Vehicle)item).Speed < 5)
                     {
                         GTAN.Function.Call<bool>(GTAN.Hash.SET_DRIVER_ABILITY, ((GTA.Vehicle)item).Driver, 100.0f);
-                        GTAN.Function.Call<bool>(GTAN.Hash.TASK_VEHICLE_DRIVE_WANDER, ((GTA.Vehicle)item).Driver, (GTA.Vehicle)item, 70, (int)GTA.DrivingStyle.AvoidTrafficExtremely);
+                        GTAN.Function.Call<bool>(GTAN.Hash.TASK_VEHICLE_DRIVE_WANDER, ((GTA.Vehicle)item).Driver, (GTA.Vehicle)item, 70, (int)GTA.DrivingStyle.IgnoreLights);
                         _traffic.Add(((GTA.Vehicle)item));
-                        
                     }
-                        
 
 
                     foreach (var hash in _hashes)
                     {
                         if (hash == item.Model.Hash)
                         {
-                            // Find the crossing traffic lights and switch them to red.
+                            // TODO: Improve it and make switching of the crossing traffic lights to red and stop cars from other directions.
 
                             GTAN.Function.Call(GTAN.Hash.SET_ENTITY_TRAFFICLIGHT_OVERRIDE, item,
                                 GTAN.Function.Call<float>(GTAN.Hash.GET_ANGLE_BETWEEN_2D_VECTORS, item.ForwardVector.X,
@@ -89,16 +91,19 @@ namespace AlwaysGreen
                     }                    
                 }
 
-                //foreach (var item in _traffic)
-                //{
-                //    if (item.Driver.Position.DistanceTo2D(Game.Player.Character.Position) > 5)
-                //    {
-                //        GTAN.Function.Call<bool>(GTAN.Hash.TASK_VEHICLE_DRIVE_WANDER, ((GTA.Vehicle)item).Driver, (GTA.Vehicle)item, 70, (int)GTA.DrivingStyle.Normal);
-                //        GTA.UI.ShowSubtitle("OwO");
-                //        //_traffic.Remove(item);
-                //    }
-                //}
+                for (int i = _traffic.Count - 1; i >= 0; --i)
+                {
+                    if (_traffic[i].Driver.Position.DistanceTo2D(Game.Player.Character.Position) > 100)
+                    {
+                        GTAN.Function.Call(GTAN.Hash.TASK_VEHICLE_DRIVE_WANDER, _traffic[i].Driver, _traffic[i], 70, (int)GTA.DrivingStyle.Normal);
+                        _traffic.RemoveAt(i);
+                    }
+                }
+
+                _tick.Restart();
             };
+
+            _tick.Restart();
         }
     }
 }
