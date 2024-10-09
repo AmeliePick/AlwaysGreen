@@ -70,7 +70,7 @@ namespace AlwaysGreen
                         GTAN.Function.Call(GTAN.Hash.GET_STREET_NAME_AT_COORD, playerPos.X, playerPos.Y, playerPos.Z, &playerStreet, &playerXStreet);
                     }
                     
-                    if (changingTL == playerStreet && GTAN.Function.Call<bool>(GTAN.Hash.IS_ENTITY_A_VEHICLE, item) && ((GTA.Vehicle)item).Speed < 5)
+                    if (changingTL == playerStreet && GTAN.Function.Call<bool>(GTAN.Hash.IS_ENTITY_A_VEHICLE, item) && ((GTA.Vehicle)item).Driver != GTA.Game.Player.Character && ((GTA.Vehicle)item).Speed < 5)
                     {
                         GTAN.Function.Call<bool>(GTAN.Hash.SET_DRIVER_ABILITY, ((GTA.Vehicle)item).Driver, 100.0f);
                         GTAN.Function.Call<bool>(GTAN.Hash.TASK_VEHICLE_DRIVE_WANDER, ((GTA.Vehicle)item).Driver, (GTA.Vehicle)item, 70, (int)GTA.DrivingStyle.IgnoreLights);
